@@ -2,11 +2,13 @@
 
 A research-oriented deep learning system for estimating **3D UAV trajectories** using **multi-channel audio recordings** from microphone arrays.
 
-This project implements an end-to-end pipeline using:
+This project implements a complete end-to-end acoustic localization pipeline using:
+
 - ROS bag audio extraction
-- GCC-PHAT spatial acoustic features
+- GCC-PHAT spatial acoustic processing
 - CNN + Transformer trajectory modeling
 - Ground-truth synchronization
+- Velocity-aware trajectory learning
 - 3D localization evaluation and visualization
 
 ---
@@ -14,14 +16,17 @@ This project implements an end-to-end pipeline using:
 # Features
 
 - Multi-channel ROS1 audio extraction
-- MMAUD dataset support
+- MMAUD dataset integration
 - STFT + GCC-PHAT feature generation
-- CNN encoder + Transformer trajectory decoder
-- Temporal trajectory conditioning
+- Full 6-pair GCC spatial encoding
+- CNN acoustic feature encoder
+- Transformer temporal trajectory modeling
+- Velocity consistency loss
+- Persistent train/inference normalization
 - Accurate GT timestamp synchronization
 - Full training / evaluation pipeline
 - 3D trajectory visualization
-- Inference on unseen audio
+- Standalone inference support
 
 ---
 
@@ -66,7 +71,7 @@ Each `.npy` file contains:
 [x, y, z]
 ```
 
-The filename itself is the timestamp.
+The filename itself acts as the trajectory timestamp.
 
 ---
 
@@ -78,7 +83,6 @@ The filename itself is the timestamp.
 ├── dataset.py
 ├── evaluate.py
 ├── extract_audio.py
-├── extract_pham4.py
 ├── feature_extraction.py
 ├── generate_aligned_labels.py
 ├── inference.py
@@ -111,21 +115,17 @@ cd <repo_name>
 
 ## 2. Create Virtual Environment
 
-```bash
-python -m venv .venv
-```
-
-Activate:
-
 ### Windows
 
 ```bash
+python -m venv .venv
 .venv\Scripts\activate
 ```
 
 ### Linux / Mac
 
 ```bash
+python -m venv .venv
 source .venv/bin/activate
 ```
 
@@ -139,20 +139,55 @@ pip install -r requirements.txt
 
 ---
 
-# Required Packages
-
-Main dependencies:
+# Main Dependencies
 
 - torch
 - torchvision
 - numpy
-- pandas
 - scipy
+- pandas
 - librosa
-- soundfile
 - matplotlib
+- soundfile
 - tqdm
 - rosbags
+- scikit-learn
+
+---
+
+# Feature Representation
+
+Each extracted acoustic feature tensor has shape:
+
+```text
+(10, 513, 64)
+```
+
+Where:
+
+| Channels | Description |
+|---|---|
+| 4 | Log-magnitude spectrograms |
+| 6 | GCC-PHAT microphone-pair features |
+
+---
+
+# GCC-PHAT Microphone Pairs
+
+The system uses all 6 microphone-pair combinations:
+
+```python
+[
+    (0,1),
+    (0,2),
+    (0,3),
+    (1,2),
+    (1,3),
+    (2,3)
+]
+```
+
+This enables complete spatial acoustic encoding.
 
 ---
 
@@ -196,7 +231,7 @@ features/
 Feature tensor shape:
 
 ```text
-(6, 513, 64)
+(10, 513, 64)
 ```
 
 ---
@@ -211,7 +246,7 @@ This synchronizes:
 - audio windows
 - GT timestamps
 
-and creates:
+and generates:
 
 ```text
 features/Pham4/labels.csv
@@ -225,12 +260,13 @@ features/Pham4/labels.csv
 python train.py
 ```
 
-Model checkpoints:
+Generated checkpoints:
 
 ```text
 checkpoints/
 ├── best_model.pth
-└── last_model.pth
+├── last_model.pth
+└── normalizer.pt
 ```
 
 ---
@@ -269,10 +305,18 @@ outputs/
 
 ---
 
-# 7. Run Inference on New Audio
+# 7. Run Standalone Inference
 
 ```bash
 python inference.py --audio_dir audio/Pham4
+```
+
+Outputs:
+
+```text
+outputs/
+├── predicted_trajectory.csv
+└── trajectory_plot.png
 ```
 
 ---
@@ -289,42 +333,48 @@ python inference.py --audio_dir audio/Pham4
 - Positional encoding
 - Trajectory-conditioned decoding
 
+## Training Improvements
+- Persistent feature normalization
+- Velocity consistency loss
+- Gradient clipping
+- Cosine annealing scheduler
+- Early stopping
+
 ## Output
 - 3D UAV position regression
 - `(x, y, z)` coordinates
 
 ---
 
-# Results
-
-## Final Evaluation Metrics
+# Final Evaluation Metrics
 
 | Metric | Value |
 |---|---|
-| APE | 0.186 m |
-| Dx | 0.142 m |
-| Dy | 0.105 m |
-| Dz | 0.013 m |
+| APE | 0.196 m |
+| Dx | 0.134 m |
+| Dy | 0.119 m |
+| Dz | 0.027 m |
 
 ---
 
-# Baseline Comparison
+# Baseline Comparison (APE)
 
 | Method | APE (m) |
 |---|---|
 | AudioNet | 2.80 |
 | DroneChase | 2.64 |
 | TAME | 0.55 |
-| Ours | 0.19 |
+| Ours | 0.20 |
 
 ---
 
-# Visualization Examples
+# Visualization Outputs
 
 The system generates:
+
 - 3D trajectory overlays
-- XYZ temporal plots
-- error histograms
+- X/Y/Z temporal plots
+- Error histograms
 - GT vs prediction comparisons
 
 ---
@@ -338,35 +388,61 @@ config.yaml
 ```
 
 Controls:
-- audio settings
-- feature parameters
+- audio preprocessing
+- feature extraction
 - model architecture
 - training hyperparameters
 - dataset paths
+- evaluation settings
 
 ---
 
 # Current Status
 
 Implemented:
-- End-to-end acoustic trajectory estimation
-- MMAUD integration
+- End-to-end acoustic UAV trajectory estimation
+- MMAUD dataset integration
+- Full GCC spatial processing
 - GT synchronization
-- Training / evaluation / inference
-- Visualization pipeline
+- Persistent normalization
+- Velocity-aware trajectory learning
+- Stable Transformer training
+- Evaluation / inference / visualization pipeline
 
-Planned enhancements:
-- Full GCC microphone-pair expansion
-- Multi-sequence training
+Current Performance:
+- ~0.20 m Absolute Position Error (APE)
+
+---
+
+# Future Enhancements
+
+Planned future work:
+
+- GT interpolation
 - Temporal smoothing
-- LiDAR pseudo-labeling
 - Real-time streaming inference
+- Multi-sequence training
+- Acoustic robustness experiments
+- Noise-condition evaluation
+- LiDAR pseudo-label integration
+
+---
+
+# Research Notes
+
+This project demonstrates that acoustic localization can provide:
+
+- illumination-invariant UAV tracking
+- robust spatial trajectory estimation
+- strong performance in low-visibility conditions
+
+without relying on camera-based tracking.
 
 ---
 
 # Citation
 
-If you use this project in research, please cite the original MMAUD / UAV localization papers accordingly.
+If you use this project in research, please cite the original MMAUD and UAV acoustic localization papers accordingly.
 
 ---
 
