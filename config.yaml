@@ -14,7 +14,7 @@ audio:
 
 # ── Features ──────────────────────────────────────────────────────────────────
 features:
-  num_channels_out: 6
+  num_channels_out: 10
   freq_bins: 513
   time_frames: 64
   gcc_max_delay: 50

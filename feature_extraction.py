@@ -11,7 +11,7 @@ Feature layout (axis-0 = channel index):
   [4]  GCC-PHAT ch1–ch2   ← cross-correlation between mic pair (0,1)
   [5]  GCC-PHAT ch1–ch3   ← cross-correlation between mic pair (0,2)
 
-Shape per window: (6, freq_bins, time_frames)
+Shape per window: (10, freq_bins, time_frames)
 
 Usage
 -----
@@ -161,14 +161,41 @@ def build_feature_tensor(
         lm = log_magnitude(Z)
         log_mags.append(_pad_or_crop(lm, F, T))
 
-    # ── 2 GCC-PHAT features (mic pairs: 0-1 and 0-2) ─────────────────────────
-    gcc01 = gcc_phat(channels[0], channels[1], n_fft, hop_length, sr, max_delay)
-    gcc02 = gcc_phat(channels[0], channels[2], n_fft, hop_length, sr, max_delay)
+    # ── GCC-PHAT features for all microphone pairs ─────────────────────────────
 
-    gcc01_r = _resize_gcc(gcc01, F, T)
-    gcc02_r = _resize_gcc(gcc02, F, T)
+    gcc_pairs = [
+        (0, 1),
+        (0, 2),
+        (0, 3),
+        (1, 2),
+        (1, 3),
+        (2, 3),
+        ]
+        #Converts 4-channel WAV audio → 10-channel feature tensors
+    gcc_features = []
 
-    tensor = np.stack(log_mags + [gcc01_r, gcc02_r], axis=0)   # (6, F, T)
+    for i, j in gcc_pairs:
+
+        gcc = gcc_phat(
+        channels[i],
+        channels[j],
+        n_fft,
+        hop_length,
+        sr,
+        max_delay
+        )
+
+        gcc_r = _resize_gcc(gcc, F, T)
+
+        gcc_features.append(gcc_r)
+
+    # Final tensor:
+    # 4 spectrogram channels + 6 GCC channels = 10 channels
+
+    tensor = np.stack(
+        log_mags + gcc_features,
+        axis=0
+    )
     return tensor.astype(np.float32)
 
 
