@@ -5,7 +5,7 @@ Acoustic Transformer for UAV 3D Trajectory Estimation.
 
 Architecture
 ────────────
-  Input  : (B, 6, F, T)   — 6-channel spectrogram tensor
+  Input  : (B, 10, F, T)   — 10-channel spectrogram tensor
   Encoder: CNN  → flatten → Transformer (self-attention)
   Decoder: Cross-attention over encoded features, conditioned on
            the last `traj_seq_len` predicted positions
@@ -57,7 +57,7 @@ class CNNEncoder(nn.Module):
         self.proj = nn.Conv2d(ch_in, d_model, kernel_size=1, bias=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """x: (B, 6, F, T)  →  (B, d_model, H', W')"""
+        """x: (B, 10, F, T)  →  (B, d_model, H', W')"""
         x = self.cnn(x)
         x = self.proj(x)
         return x
@@ -124,7 +124,7 @@ class TransformerEncoder(nn.Module):
             dim_feedforward=dim_feedforward,
             dropout=dropout,
             batch_first=True,   # (B, S, D)
-            norm_first=True,    # pre-LN for training stability
+            norm_first=False,    # pre-LN for training stability
         )
         self.encoder = nn.TransformerEncoder(enc_layer, num_layers=num_layers,
                                              norm=nn.LayerNorm(d_model))
@@ -169,7 +169,7 @@ class TrajectoryDecoder(nn.Module):
             dim_feedforward=dim_feedforward,
             dropout=dropout,
             batch_first=True,
-            norm_first=True,
+            norm_first=False,
         )
         self.decoder = nn.TransformerDecoder(dec_layer, num_layers=num_layers,
                                              norm=nn.LayerNorm(d_model))

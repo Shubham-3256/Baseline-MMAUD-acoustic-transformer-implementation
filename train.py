@@ -97,7 +97,17 @@ def run_epoch(model: nn.Module,
             lbl  = lbl.to(device, non_blocking=True)    # (B, 3)
 
             pred = model(feat, hist)                    # (B, 3)
-            loss = criterion(pred, lbl)
+            # Position loss
+            pos_loss = criterion(pred, lbl)
+
+            # Velocity loss
+            vel_pred = pred - hist[:, -1, :]
+            vel_gt   = lbl  - hist[:, -1, :]
+
+            vel_loss = criterion(vel_pred, vel_gt)
+
+            # Combined loss
+            loss = pos_loss + 0.3 * vel_loss
 
             if is_train:
                 optimizer.zero_grad(set_to_none=True)
